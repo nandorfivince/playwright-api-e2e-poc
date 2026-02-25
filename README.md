@@ -18,10 +18,12 @@ Proof of Concept — a lightweight, fast, and free API testing framework using P
 ## Quickstart
 
 ```bash
-git clone <repo-url> && cd playwright-api-e2e-poc
+git clone https://github.com/nandorfivince/playwright-api-e2e-poc.git
+cd playwright-api-e2e-poc
 npm install
 npm test
-npm run test:allure    # opens Allure report in browser
+npx playwright show-report # opens Playwright report in browser
+npm run test:allure        # opens Allure report in browser
 ```
 
 Or with Docker:
