@@ -1,0 +1,19 @@
+services:
+  api-tests:
+    build: .
+    environment:
+      - BASE_URL_REST=https://jsonplaceholder.typicode.com
+      - BASE_URL_GRAPHQL=https://countries.trevorblades.com/graphql
+    volumes:
+      - ./allure-results:/app/allure-results
+      - ./playwright-report:/app/playwright-report
+
+  # Run specific test suites
+  smoke:
+    build: .
+    command: npx playwright test --grep @smoke
+    environment:
+      - BASE_URL_REST=https://jsonplaceholder.typicode.com
+      - BASE_URL_GRAPHQL=https://countries.trevorblades.com/graphql
+    volumes:
+      - ./allure-results:/app/allure-results

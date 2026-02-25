@@ -1,0 +1,26 @@
+{
+  "name": "playwright-api-e2e-poc",
+  "version": "1.0.0",
+  "description": "Playwright API E2E Testing POC — REST + GraphQL with Allure reporting",
+  "private": true,
+  "scripts": {
+    "test": "npx playwright test",
+    "test:rest": "npx playwright test tests/rest/",
+    "test:graphql": "npx playwright test tests/graphql/",
+    "test:smoke": "npx playwright test --grep @smoke",
+    "test:regression": "npx playwright test --grep @regression",
+    "test:demo": "npx playwright test --grep @demo",
+    "test:report": "npx playwright show-report",
+    "test:allure": "npx allure serve allure-results"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.50.0",
+    "allure-playwright": "^3.0.0",
+    "graphql": "^16.10.0",
+    "graphql-request": "^7.1.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
