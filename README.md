@@ -22,8 +22,8 @@ git clone https://github.com/nandorfivince/playwright-api-e2e-poc.git
 cd playwright-api-e2e-poc
 npm install
 npm test
-npx playwright show-report # opens Playwright report in browser
-npm run test:allure        # opens Allure report in browser
+npm run test:report # opens Playwright report in browser
+npm run test:allure # opens Allure report in browser
 ```
 
 Or with Docker:
