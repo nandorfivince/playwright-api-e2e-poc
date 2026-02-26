@@ -5,7 +5,7 @@ on:
   pull_request:
   workflow_dispatch:
   schedule:
-    - cron: '0 6 * * 1-5' # Weekdays at 06:00 UTC
+    - cron: '0 * * * *' # Every hour
 
 jobs:
   smoke:
