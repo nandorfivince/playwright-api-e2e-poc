@@ -72,3 +72,9 @@ allure serve allure-results
 | POC Bible — Onboarding | Developer deep dive | [docs/03-POC-BIBLE-ONBOARDING.en.md](docs/03-POC-BIBLE-ONBOARDING.en.md) |
 
 All three documents are also available in Hungarian, Romanian, and Lithuanian in the `docs/` folder.
+
+---
+
+## DEMO SCREENSHOTS
+
+Screenshots of Allure reports, Playwright reports, and GitHub Actions CI/CD pipeline are available in the **[docs/imgs/](docs/imgs/)** folder.
