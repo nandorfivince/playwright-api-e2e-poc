@@ -770,24 +770,50 @@ services:
 
 ### Workflow GitHub Actions
 
+Pipeline-ul are două job-uri: `test-and-deploy` (rularea testelor + generarea tuturor rapoartelor) și `deploy` (publicare pe GitHub Pages).
+
 ```yaml
 on:
-  pull_request:              # Rulează la fiecare PR
-  schedule:
-    - cron: '0 6 * * 1-5'   # De luni până vineri dimineața la ora 6
+  push:                        # Fiecare push declanșează pipeline-ul
+  pull_request:                # Fiecare PR de asemenea
+  workflow_dispatch:           # Declanșare manuală din interfața GitHub
+
+permissions:
+  pages: write                 # Necesar pentru deploy pe GitHub Pages
+  id-token: write              # Token OIDC pentru Pages
 
 jobs:
-  test:
-    runs-on: ubuntu-latest   # Rulează pe server Ubuntu
+  test-and-deploy:
+    runs-on: ubuntu-latest
     steps:
-      - checkout             # Descărcarea codului
-      - setup-node           # Instalarea Node.js
-      - npm ci               # Instalarea dependințelor
-      - playwright test      # Execuția testelor
-      - upload-artifact      # Arhivarea raportului (30 de zile)
+      - checkout               # Descărcarea codului
+      - setup-node             # Instalarea Node.js 20
+      - npm ci                 # Instalarea dependințelor
+      - install allure CLI     # Pentru generarea HTML Allure
+      - npm test               # Toate testele + generare Network/Full rapoarte
+      - allure generate        # Generare HTML Allure în playwright-report/allure/
+      - upload-artifact        # Arhivarea tuturor rapoartelor (30 zile)
+      - upload-pages-artifact  # Pregătire pentru deploy Pages
+      - print report URLs      # 4 linkuri clickabile în consolă
+
+  deploy:
+    needs: test-and-deploy
+    steps:
+      - deploy-pages           # Publicare pe GitHub Pages
+      - print report URLs      # 4 linkuri clickabile în consolă
 ```
 
-**Rezultat:** La fiecare PR toate testele rulează automat. Dacă ceva eșuează, check-ul va fi roșu pe PR.
+**Rezultat:** Fiecare push rulează toate testele și publică cele 4 rapoarte pe GitHub Pages. În consolă apar URL-uri clickabile:
+
+```
+Reports available at:
+  Playwright HTML  → https://nandorfivince.github.io/playwright-api-e2e-poc/
+  Allure Report    → https://nandorfivince.github.io/playwright-api-e2e-poc/allure/index.html
+  Network Report   → https://nandorfivince.github.io/playwright-api-e2e-poc/network-report.html
+  Full Report      → https://nandorfivince.github.io/playwright-api-e2e-poc/full-report.html
+```
+
+Nu trebuie descărcat nimic — click și vizualizare în browser, exact ca linkurile Cypress Cloud.
 
 ---
 

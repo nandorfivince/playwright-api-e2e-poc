@@ -770,24 +770,50 @@ A `volumes` kulcsfontosságú: az allure-results és playwright-report mappák a
 
 ### GitHub Actions workflow
 
+A pipeline két job-ból áll: `test-and-deploy` (tesztek futtatása + összes report generálása) és `deploy` (GitHub Pages-re publikálás).
+
 ```yaml
 on:
-  pull_request:              # Minden PR-nél fut
-  schedule:
-    - cron: '0 6 * * 1-5'   # Hétfőtől péntekig reggel 6-kor
+  push:                        # Minden push elindítja a pipeline-t
+  pull_request:                # Minden PR is
+  workflow_dispatch:           # Kézi indítás a GitHub felületen
+
+permissions:
+  pages: write                 # GitHub Pages deploy-hoz szükséges
+  id-token: write              # OIDC token Pages-hez
 
 jobs:
-  test:
-    runs-on: ubuntu-latest   # Ubuntu szerveren fut
+  test-and-deploy:
+    runs-on: ubuntu-latest
     steps:
-      - checkout             # Kód letöltése
-      - setup-node           # Node.js telepítése
-      - npm ci               # Függőségek telepítése
-      - playwright test      # Tesztek futtatása
-      - upload-artifact      # Riport archiválás (30 napig)
+      - checkout               # Kód letöltése
+      - setup-node             # Node.js 20 telepítése
+      - npm ci                 # Függőségek telepítése
+      - install allure CLI     # Allure HTML generáláshoz
+      - npm test               # Összes teszt + Network/Full report generálás
+      - allure generate        # Allure HTML generálás a playwright-report/allure/ mappába
+      - upload-artifact        # Összes report archiválás (30 nap)
+      - upload-pages-artifact  # Előkészítés Pages deploy-hoz
+      - print report URLs      # 4 kattintható link a console-ban
+
+  deploy:
+    needs: test-and-deploy
+    steps:
+      - deploy-pages           # Publikálás GitHub Pages-re
+      - print report URLs      # 4 kattintható link a console-ban
 ```
 
-**Eredmény:** Minden PR-nél automatikusan lefut az összes teszt. Ha bármi elbukik, a PR-en piros lesz a check.
+**Eredmény:** Minden push futtatja az összes tesztet és deploy-olja a 4 reportot GitHub Pages-re. A console-ban kattintható URL-ek jelennek meg:
+
+```
+Reports available at:
+  Playwright HTML  → https://nandorfivince.github.io/playwright-api-e2e-poc/
+  Allure Report    → https://nandorfivince.github.io/playwright-api-e2e-poc/allure/index.html
+  Network Report   → https://nandorfivince.github.io/playwright-api-e2e-poc/network-report.html
+  Full Report      → https://nandorfivince.github.io/playwright-api-e2e-poc/full-report.html
+```
+
+Nem kell letölteni — kattintás és böngészőben megnyílik, pont mint a Cypress Cloud linkeknél.
 
 ---
 

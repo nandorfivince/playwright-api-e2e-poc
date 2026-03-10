@@ -201,6 +201,19 @@ Pentru fiecare test vezi:
 - Detalii erori cu fragment de cod sursă (pentru testele eșuate)
 - Toate apelurile network efectuate în timpul testului — tab-uri request/response, headere, body, buton Copy
 
+### Rapoarte CI/CD (GitHub Pages)
+
+În CI (GitHub Actions), după fiecare push toate cele 4 rapoarte sunt publicate automat pe GitHub Pages. Nu trebuie descărcat nimic — click pe link și vizualizați în browser:
+
+| Raport | URL |
+|--------|-----|
+| Playwright HTML | [nandorfivince.github.io/playwright-api-e2e-poc/](https://nandorfivince.github.io/playwright-api-e2e-poc/) |
+| Allure Report | [.../allure/index.html](https://nandorfivince.github.io/playwright-api-e2e-poc/allure/index.html) |
+| Network Report | [.../network-report.html](https://nandorfivince.github.io/playwright-api-e2e-poc/network-report.html) |
+| Full Report | [.../full-report.html](https://nandorfivince.github.io/playwright-api-e2e-poc/full-report.html) |
+
+URL-urile sunt afișate și în consola GitHub Actions la sfârșitul fiecărei rulări de workflow.
+
 ### Allure Trend (istoricul între rulări)
 
 Allure poate afișa grafice de tendință (raport pass/fail, durata, reîncercări) între mai multe rulări de teste. Pentru aceasta, istoricul din raportul anterior trebuie copiat în rezultatele următoarei rulări.

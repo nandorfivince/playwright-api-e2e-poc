@@ -770,24 +770,50 @@ The `volumes` key is crucial: the allure-results and playwright-report folders w
 
 ### GitHub Actions workflow
 
+The pipeline has two jobs: `test-and-deploy` (runs tests + generates all reports) and `deploy` (publishes to GitHub Pages).
+
 ```yaml
 on:
-  pull_request:              # Runs on every PR
-  schedule:
-    - cron: '0 6 * * 1-5'   # Monday to Friday at 6 AM
+  push:                        # Every push triggers the pipeline
+  pull_request:                # Every PR too
+  workflow_dispatch:           # Manual trigger from GitHub UI
+
+permissions:
+  pages: write                 # Needed for GitHub Pages deployment
+  id-token: write              # OIDC token for Pages
 
 jobs:
-  test:
-    runs-on: ubuntu-latest   # Runs on Ubuntu server
+  test-and-deploy:
+    runs-on: ubuntu-latest
     steps:
-      - checkout             # Download code
-      - setup-node           # Install Node.js
-      - npm ci               # Install dependencies
-      - playwright test      # Run tests
-      - upload-artifact      # Archive report (for 30 days)
+      - checkout               # Download code
+      - setup-node             # Install Node.js 20
+      - npm ci                 # Install dependencies
+      - install allure CLI     # For generating Allure HTML
+      - npm test               # Run all tests + generate Network/Full reports
+      - allure generate        # Generate Allure HTML into playwright-report/allure/
+      - upload-artifact        # Archive all reports (30 days)
+      - upload-pages-artifact  # Prepare for Pages deployment
+      - print report URLs      # 4 clickable links in console
+
+  deploy:
+    needs: test-and-deploy
+    steps:
+      - deploy-pages           # Publish to GitHub Pages
+      - print report URLs      # 4 clickable links in console
 ```
 
-**Result:** All tests run automatically on every PR. If anything fails, the PR check turns red.
+**Result:** Every push runs all tests and deploys 4 reports to GitHub Pages. The console shows clickable URLs:
+
+```
+Reports available at:
+  Playwright HTML  → https://nandorfivince.github.io/playwright-api-e2e-poc/
+  Allure Report    → https://nandorfivince.github.io/playwright-api-e2e-poc/allure/index.html
+  Network Report   → https://nandorfivince.github.io/playwright-api-e2e-poc/network-report.html
+  Full Report      → https://nandorfivince.github.io/playwright-api-e2e-poc/full-report.html
+```
+
+No download needed — click and view in browser, just like Cypress Cloud links.
 
 ---
 

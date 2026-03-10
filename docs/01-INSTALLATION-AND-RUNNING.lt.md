@@ -201,6 +201,19 @@ Kiekvienam testui matote:
 - Klaidos detales su kodo fragmentu (nepavykusiems testams)
 - Visus tinklo kvietimus testo metu — užklausos/atsakymo skirtukai, antraštės, body, Copy mygtukas
 
+### CI/CD ataskaitos (GitHub Pages)
+
+CI aplinkoje (GitHub Actions) po kiekvieno push visi 4 raportai automatiškai publikuojami į GitHub Pages. Nereikia atsisiųsti — spustelėkite nuorodą ir peržiūrėkite naršyklėje:
+
+| Ataskaita | URL |
+|-----------|-----|
+| Playwright HTML | [nandorfivince.github.io/playwright-api-e2e-poc/](https://nandorfivince.github.io/playwright-api-e2e-poc/) |
+| Allure Report | [.../allure/index.html](https://nandorfivince.github.io/playwright-api-e2e-poc/allure/index.html) |
+| Network Report | [.../network-report.html](https://nandorfivince.github.io/playwright-api-e2e-poc/network-report.html) |
+| Full Report | [.../full-report.html](https://nandorfivince.github.io/playwright-api-e2e-poc/full-report.html) |
+
+URL adresai taip pat rodomi GitHub Actions konsolės žurnale kiekvieno workflow vykdymo pabaigoje.
+
 ### Allure tendencija (istorija tarp paleidimų)
 
 Allure gali rodyti tendencijų grafikus (pass/fail santykis, trukmė, pakartojimas) tarp kelių testų paleidimų. Tam reikia nukopijuoti ankstesnės ataskaitos istoriją į kitų paleidimo rezultatus.

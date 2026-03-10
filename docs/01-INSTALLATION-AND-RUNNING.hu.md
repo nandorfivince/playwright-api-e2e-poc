@@ -201,6 +201,19 @@ Minden tesztnél látod:
 - Hiba részletek forráskód részlettel (bukó teszteknél)
 - Az összes network hívás a teszt alatt — request/response tab-ok, headerek, body, Copy gomb
 
+### CI/CD Reportok (GitHub Pages)
+
+CI-ban (GitHub Actions) minden push után mind a 4 report automatikusan deploy-olódik GitHub Pages-re. Nem kell letölteni — kattints a linkre és nézd böngészőben:
+
+| Report | URL |
+|--------|-----|
+| Playwright HTML | [nandorfivince.github.io/playwright-api-e2e-poc/](https://nandorfivince.github.io/playwright-api-e2e-poc/) |
+| Allure Report | [.../allure/index.html](https://nandorfivince.github.io/playwright-api-e2e-poc/allure/index.html) |
+| Network Report | [.../network-report.html](https://nandorfivince.github.io/playwright-api-e2e-poc/network-report.html) |
+| Full Report | [.../full-report.html](https://nandorfivince.github.io/playwright-api-e2e-poc/full-report.html) |
+
+Az URL-ek a GitHub Actions console logban is megjelennek minden workflow futás végén.
+
 ### Allure Trend (futtatások közötti előzmények)
 
 Az Allure képes trend grafikonokat megjeleníteni (pass/fail arány, futási idő, retry-ok) több futtatás között. Ehhez az előző riport history mappáját kell visszamásolni a következő futás eredményei közé.

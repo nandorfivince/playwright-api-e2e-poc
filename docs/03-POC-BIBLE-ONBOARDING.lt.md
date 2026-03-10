@@ -770,24 +770,50 @@ services:
 
 ### GitHub Actions workflow
 
+Pipeline susideda iš dviejų darbų: `test-and-deploy` (testų vykdymas + visų ataskaitų generavimas) ir `deploy` (publikavimas į GitHub Pages).
+
 ```yaml
 on:
-  pull_request:              # Vykdoma kiekvienam PR
-  schedule:
-    - cron: '0 6 * * 1-5'   # Pirmadienį–penktadienį 6 val. ryte
+  push:                        # Kiekvienas push paleidžia pipeline
+  pull_request:                # Kiekvienas PR taip pat
+  workflow_dispatch:           # Rankinis paleidimas iš GitHub UI
+
+permissions:
+  pages: write                 # Reikalinga GitHub Pages publikavimui
+  id-token: write              # OIDC token Pages
 
 jobs:
-  test:
-    runs-on: ubuntu-latest   # Vykdoma Ubuntu serveryje
+  test-and-deploy:
+    runs-on: ubuntu-latest
     steps:
-      - checkout             # Kodo parsisiuntimas
-      - setup-node           # Node.js diegimas
-      - npm ci               # Priklausomybių diegimas
-      - playwright test      # Testų vykdymas
-      - upload-artifact      # Ataskaitos archyvavimas (30 dienų)
+      - checkout               # Kodo parsisiuntimas
+      - setup-node             # Node.js 20 diegimas
+      - npm ci                 # Priklausomybių diegimas
+      - install allure CLI     # Allure HTML generavimui
+      - npm test               # Visi testai + Network/Full ataskaitų generavimas
+      - allure generate        # Allure HTML generavimas į playwright-report/allure/
+      - upload-artifact        # Visų ataskaitų archyvavimas (30 dienų)
+      - upload-pages-artifact  # Paruošimas Pages publikavimui
+      - print report URLs      # 4 paspaudžiamos nuorodos konsolėje
+
+  deploy:
+    needs: test-and-deploy
+    steps:
+      - deploy-pages           # Publikavimas į GitHub Pages
+      - print report URLs      # 4 paspaudžiamos nuorodos konsolėje
 ```
 
-**Rezultatas:** Kiekvieno PR metu automatiškai vykdomi visi testai. Jei kas nors nepavyksta, PR turės raudoną check.
+**Rezultatas:** Kiekvienas push vykdo visus testus ir publikuoja 4 ataskaitas į GitHub Pages. Konsolėje rodomos paspaudžiamos nuorodos:
+
+```
+Reports available at:
+  Playwright HTML  → https://nandorfivince.github.io/playwright-api-e2e-poc/
+  Allure Report    → https://nandorfivince.github.io/playwright-api-e2e-poc/allure/index.html
+  Network Report   → https://nandorfivince.github.io/playwright-api-e2e-poc/network-report.html
+  Full Report      → https://nandorfivince.github.io/playwright-api-e2e-poc/full-report.html
+```
+
+Nereikia atsisiųsti — spustelėkite ir peržiūrėkite naršyklėje, lygiai kaip Cypress Cloud nuorodos.
 
 ---
 
