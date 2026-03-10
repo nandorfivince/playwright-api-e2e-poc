@@ -126,9 +126,12 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,  // 2 reîncercări în CI, 0 local
   timeout: 30_000,             // Maximum 30s/test (dacă nu se finalizează în acest timp, este eronat)
 
+  globalSetup: './scripts/clean-network-data.ts',  // Curățare network-data/ înainte de rulare
+
   reporter: [
     ['list'],                  // Ieșire în consolă (numele testelor + timp)
     ['html', { ... }],        // Raport HTML (în directorul playwright-report/)
+    ['json', { ... }],        // Raport JSON (pentru generarea Full Report)
     ['allure-playwright', { ... }],  // Raport Allure (în directorul allure-results/)
   ],
 
@@ -309,6 +312,31 @@ Automat fiecare copil (`UsersApi`, `CountriesGraphQLApi`) o primește. Nu trebui
 2. **Funcții helper** — `setTestMeta()` și `logResponseTime()`
 
 **Cine o apelează?** Fiecare fișier spec, la începutul fiecărui test.
+
+### `support/fixtures/base.fixture.ts`
+
+**Ce este?** Un fixture Playwright personalizat care oferă `trackedRequest` — un `APIRequestContext` înfășurat cu Proxy care urmărește automat fiecare apel API (timing, detalii request/response) fără niciun cod suplimentar în teste.
+
+**Cum funcționează?**
+- Înfășoară `request`-ul integrat Playwright cu un `Proxy` JavaScript
+- Interceptează fiecare apel de metodă HTTP (GET, POST, PUT, DELETE, etc.)
+- Măsoară automat timpul de răspuns
+- Atașează detaliile request/response la raportul Allure
+- Salvează datele apelurilor network în directorul `network-data/` pentru generarea rapoartelor
+
+**Cine o folosește?** Fiecare fișier spec importă `test` și `expect` din acest fișier în loc de `@playwright/test`.
+
+**Impactul asupra testelor:** Testele nu mai au nevoie de cronometrare manuală cu `Date.now()` sau apeluri `attachApiDetails()` — fixture-ul gestionează totul transparent. Testele sunt mai curate, conținând doar logica de business.
+
+### `support/helpers/network-collector.ts`
+
+**Ce este?** O utilitate care salvează datele apelurilor API (URL request, metodă, headere, body, status răspuns, body răspuns, durată) ca fișiere JSON individuale în directorul `network-data/`.
+
+**De ce fișiere individuale?** Playwright rulează testele în paralel pe mai mulți workeri. Un array în memorie ar captura doar apelurile unui singur worker. Colectarea bazată pe fișiere funcționează pe toți workerii.
+
+**Cine o apelează?** `allure.helper.ts` → `attachApiDetails()` → `saveNetworkCall()`. Aceasta se întâmplă automat prin fixture-ul `trackedRequest`.
+
+**Cine citește datele?** Generatoarele de rapoarte post-test (`generate-network-report.ts` și `generate-full-report.ts`) citesc toate fișierele JSON din `network-data/` pentru a construi rapoartele HTML.
 
 ---
 
@@ -516,8 +544,8 @@ Exemple:
 test.describe('REST — GET /users', () => {        // Grup logic
   let usersApi: UsersApi;                          // Declarare variabilă
 
-  test.beforeEach(async ({ request }) => {         // Se execută ÎNAINTE de fiecare test
-    usersApi = new UsersApi(request);              // Crearea unui API Object nou
+  test.beforeEach(async ({ trackedRequest }) => {  // trackedRequest din base.fixture.ts
+    usersApi = new UsersApi(trackedRequest);       // Apelurile API sunt urmărite automat
   });
 
   test('...', async () => { ... });                // Testul 1
@@ -527,7 +555,7 @@ test.describe('REST — GET /users', () => {        // Grup logic
 
 **`test.beforeEach`** — rulează înainte de fiecare test. Asigură că fiecare test pornește dintr-o stare curată (nu există state partajat între teste).
 
-**`{ request }`** — Playwright oferă automat un `APIRequestContext`. Acesta este clientul HTTP care trimite cereri către `baseURL`-ul configurat.
+**`{ trackedRequest }`** — Oferit de `base.fixture.ts`. Înfășoară `APIRequestContext`-ul Playwright cu un Proxy care măsoară automat timpul și atașează detaliile request/response la rapoarte. Testele îl folosesc exact ca `request`-ul standard — nu sunt necesare modificări de API.
 
 ---
 
@@ -650,6 +678,33 @@ allure open allure-report
 
 **Ce vede Test Managerul?** După 3-5 rulări cu istoricul păstrat, dashboard-ul Allure afișează grafice liniare care arată stabilitatea, modificările de viteză și pattern-urile de regresie în timp — esențiale pentru sprint review-uri și raportarea calității.
 
+### Network Report și Full Report — raportare suplimentară
+
+Dincolo de Allure, framework-ul generează automat două rapoarte HTML suplimentare după fiecare rulare de teste:
+
+**Network Report** (`playwright-report/network-report.html`)
+- Interfață stil Chrome DevTools Network tab (temă întunecată)
+- Fiecare apel API listat cu: status code, metodă, URL, timestamp, durată
+- Click pe orice apel → tab-uri Request/Response — tabel headere, JSON body cu buton Copy
+- Filtrare după status (All / 2xx / 4xx / 5xx) și căutare text
+- Util pentru: copierea datelor request/response în OpenSearch, partajarea detaliilor API cu dezvoltatorii backend
+
+**Full Report** (`playwright-report/full-report.html`)
+- Rezultate teste combinate + date network într-o singură vizualizare
+- Panel stâng: listă teste cu iconițe pass/fail, durată, fișier:linie, taguri
+- Panel drept per test: detalii erori (cu fragment cod sursă pentru eșecuri), apeluri network (colapsabile, cu tab-uri request/response)
+- Similar cu Cypress Cloud Test Replay — dar gratuit, offline, HTML autonom
+
+**Comenzi:**
+```bash
+npm run test:network      # Deschidere Network Report în browser
+npm run test:full-report  # Deschidere Full Report în browser
+npm run report:network    # Doar generare Network Report
+npm run report:full       # Doar generare Full Report
+```
+
+> **Notă:** Toate comenzile `npm test` / `npm run test:*` generează automat ambele rapoarte după rularea testelor. Comenzile separate `report:*` sunt pentru regenerare fără rerularea testelor.
+
 ---
 
 ## 13. Sistemul de taguri — @smoke, @regression, @demo
@@ -765,6 +820,7 @@ jobs:
 5. **Categories** — tipuri de erori (Product defect, Test defect)
 6. **Retries** — identificarea testelor flaky
 7. **Duration** — care test este cel mai lent
+8. **Full Report** — pass/fail combinat + detalii erori + apeluri network per test — ideal pentru depanare rapidă fără comutare între instrumente
 
 ### Trasabilitate (Traceability)
 
@@ -854,8 +910,13 @@ await allure.link('https://jira.example.com/browse/PROJ-123', 'PROJ-123', 'issue
 │  Reporteri (definiți în playwright.config.ts)                   │
 │  ├── list         → ieșire consolă (✓ / ✘ + timp)              │
 │  ├── html         → playwright-report/ (fișiere HTML)           │
+│  ├── json         → playwright-report/test-results.json        │
 │  └── allure       → allure-results/ (fișiere JSON)              │
 │                      └── allure serve → dashboard în browser    │
+│                                                                │
+│  Generatoare rapoarte post-test (rulează după teste):          │
+│  ├── network-report → playwright-report/network-report.html    │
+│  └── full-report    → playwright-report/full-report.html       │
 └────────────────────────────────────────────────────────────────┘
 ```
 

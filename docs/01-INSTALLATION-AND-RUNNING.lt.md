@@ -170,6 +170,37 @@ allure generate allure-results -o allure-report --clean
 allure open allure-report
 ```
 
+### Network Report (Chrome DevTools stilius)
+
+Paleidus testus, automatiškai sugeneruojama atskira HTML ataskaita, rodanti kiekvieną API kvietimą Chrome DevTools Network tab stiliumi — tamsi tema, užklausos/atsakymo detalės, antraštės, body su Copy mygtuku, statuso kodo filtravimas.
+
+```bash
+# Network Report atidarymas naršyklėje
+npm run test:network
+
+# Tik generavimas (be atidarymo)
+npm run report:network
+```
+
+Tai ypač naudinga API klaidų derinimui — galite kopijuoti užklausos/atsakymo duomenis tiesiai į OpenSearch arba dalintis su backend programuotojais.
+
+### Full Report (testų rezultatai + tinklo duomenys kartu)
+
+Kombinuota HTML ataskaita, kuri sujungia Playwright testų rezultatus (pass/fail, klaidos, kodo fragmentai) su tinklo kvietimų duomenimis kiekvienam testui. Panašu į Cypress Cloud Test Replay, bet nemokama ir savarankiška.
+
+```bash
+# Full Report atidarymas naršyklėje
+npm run test:full-report
+
+# Tik generavimas (be atidarymo)
+npm run report:full
+```
+
+Kiekvienam testui matote:
+- Pass/fail statusą, trukmę, failo vietą, žymas
+- Klaidos detales su kodo fragmentu (nepavykusiems testams)
+- Visus tinklo kvietimus testo metu — užklausos/atsakymo skirtukai, antraštės, body, Copy mygtukas
+
 ### Allure tendencija (istorija tarp paleidimų)
 
 Allure gali rodyti tendencijų grafikus (pass/fail santykis, trukmė, pakartojimas) tarp kelių testų paleidimų. Tam reikia nukopijuoti ankstesnės ataskaitos istoriją į kitų paleidimo rezultatus.
@@ -264,6 +295,10 @@ npx playwright show-report playwright-report
 | Projektas + žyma | `npx playwright test --project=rest-api --grep @smoke` |
 | Playwright ataskaita | `npm run test:report` |
 | Allure ataskaita | `npm run test:allure` |
+| Network Report | `npm run test:network` |
+| Full Report | `npm run test:full-report` |
+| Tik Network Report generavimas | `npm run report:network` |
+| Tik Full Report generavimas | `npm run report:full` |
 | Docker — visi | `docker compose up --build` |
 | Docker — smoke | `docker compose run api-tests npx playwright test --grep @smoke` |
 | Docker — vienas testas | `docker compose run api-tests npx playwright test -g "testoPavadinimas"` |

@@ -126,9 +126,12 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,  // CI-ben 2 retry, lokálban 0
   timeout: 30_000,             // Maximum 30mp/teszt (ha ennyi idő alatt sem fut le, hibás)
 
+  globalSetup: './scripts/clean-network-data.ts',  // network-data/ törlése futás előtt
+
   reporter: [
     ['list'],                  // Konzol kimenet (teszt nevek + idő)
     ['html', { ... }],        // HTML riport (playwright-report/ mappába)
+    ['json', { ... }],        // JSON riport (Full Report generáláshoz)
     ['allure-playwright', { ... }],  // Allure riport (allure-results/ mappába)
   ],
 
@@ -309,6 +312,31 @@ Automatikusan minden gyermek (`UsersApi`, `CountriesGraphQLApi`) megkapja. Nem k
 2. **Helper funkciók** — `setTestMeta()` és `logResponseTime()`
 
 **Ki hívja?** Minden spec fájl, minden teszt elején.
+
+### `support/fixtures/base.fixture.ts`
+
+**Mi ez?** Egy egyedi Playwright fixture ami `trackedRequest`-et biztosít — egy Proxy-val becsomagolt `APIRequestContext`, ami automatikusan követ minden API hívást (időmérés, request/response részletek) mindenféle boilerplate nélkül a tesztekben.
+
+**Hogyan működik?**
+- Becsomagolja a Playwright beépített `request`-jét egy JavaScript `Proxy`-val
+- Elfogja minden HTTP metódus hívást (GET, POST, PUT, DELETE, stb.)
+- Automatikusan méri a válaszidőt
+- Csatolja a request/response részleteket az Allure riportba
+- Elmenti a network hívás adatokat a `network-data/` mappába a riport generáláshoz
+
+**Ki használja?** Minden spec fájl ebből a fájlból importálja a `test`-et és `expect`-et a `@playwright/test` helyett.
+
+**Hatása a tesztekre:** A teszteknek már nem kell kézzel `Date.now()` időmérés vagy `attachApiDetails()` hívás — a fixture transzparensen kezeli. A tesztek tisztábbak, csak üzleti logikát tartalmaznak.
+
+### `support/helpers/network-collector.ts`
+
+**Mi ez?** Egy segédeszköz ami az API hívás adatokat (request URL, metódus, headerek, body, response státusz, response body, időtartam) egyedi JSON fájlokként menti a `network-data/` mappába.
+
+**Miért egyedi fájlok?** A Playwright párhuzamosan futtatja a teszteket több worker-ben. Egy memóriabeli tömb csak egy worker hívásait rögzítené. Fájl-alapú gyűjtés az összes worker-en működik.
+
+**Ki hívja?** `allure.helper.ts` → `attachApiDetails()` → `saveNetworkCall()`. Ez automatikusan történik a `trackedRequest` fixture-ön keresztül.
+
+**Ki olvassa az adatokat?** A teszt utáni riport generátorok (`generate-network-report.ts` és `generate-full-report.ts`) olvassák be az összes JSON fájlt a `network-data/`-ból a HTML riportok felépítéséhez.
 
 ---
 
@@ -516,8 +544,8 @@ Példák:
 test.describe('REST — GET /users', () => {        // Logikai csoport
   let usersApi: UsersApi;                          // Változó deklaráció
 
-  test.beforeEach(async ({ request }) => {         // MINDEN teszt előtt lefut
-    usersApi = new UsersApi(request);              // Új API Object létrehozás
+  test.beforeEach(async ({ trackedRequest }) => {  // trackedRequest a base.fixture.ts-ből
+    usersApi = new UsersApi(trackedRequest);       // API hívások automatikusan követve
   });
 
   test('...', async () => { ... });                // Teszt 1
@@ -527,7 +555,7 @@ test.describe('REST — GET /users', () => {        // Logikai csoport
 
 **`test.beforeEach`** — minden teszt előtt fut. Biztosítja, hogy minden teszt tiszta állapotból indul (nincs megosztott state a tesztek között).
 
-**`{ request }`** — Playwright automatikusan ad egy `APIRequestContext`-et. Ez az HTTP kliens ami a konfigurált `baseURL`-re küld kéréseket.
+**`{ trackedRequest }`** — A `base.fixture.ts` biztosítja. Becsomagolja a Playwright `APIRequestContext`-jét egy Proxy-val, ami automatikusan méri az időt és csatolja a request/response részleteket a riportokba. A tesztek pontosan úgy használják mint a standard `request`-et — nincs API változás.
 
 ---
 
@@ -650,6 +678,33 @@ allure open allure-report
 
 **Mit lát a Test Manager?** 3-5 futtatás után megőrzött history-val az Allure dashboard vonaldiagramokat jelenít meg, amelyek mutatják a stabilitást, sebességváltozásokat és regressziós mintákat az idő múlásával — nélkülözhetetlenek a sprint review-khoz és minőségi riportoláshoz.
 
+### Network Report és Full Report — kiegészítő riportolás
+
+Az Allure-ön túl a keretrendszer két további HTML riportot generál automatikusan minden teszt futtatás után:
+
+**Network Report** (`playwright-report/network-report.html`)
+- Chrome DevTools Network tab stílusú felület (sötét téma)
+- Minden API hívás listázva: státusz kód, metódus, URL, időbélyeg, időtartam
+- Kattints bármelyik hívásra → Request/Response tab-ok — header táblázat, JSON body Copy gombbal
+- Szűrés státusz alapján (All / 2xx / 4xx / 5xx) és szöveges keresés
+- Hasznos: request/response adatok másolása OpenSearch-be, API részletek megosztása backend fejlesztőkkel
+
+**Full Report** (`playwright-report/full-report.html`)
+- Kombinált teszt eredmények + network adatok egy nézetben
+- Bal panel: teszt lista pass/fail ikonokkal, időtartam, fájl:sor, tag-ek
+- Jobb panel tesztenként: hiba részletek (forráskód részlettel a bukásoknál), network hívások (összecsukható, request/response tab-okkal)
+- Hasonló a Cypress Cloud Test Replay-hez — de ingyenes, offline, önálló HTML
+
+**Parancsok:**
+```bash
+npm run test:network      # Network Report megnyitása böngészőben
+npm run test:full-report  # Full Report megnyitása böngészőben
+npm run report:network    # Csak Network Report generálás
+npm run report:full       # Csak Full Report generálás
+```
+
+> **Megjegyzés:** Minden `npm test` / `npm run test:*` parancs automatikusan generálja mindkét riportot a teszt futtatás után. A külön `report:*` parancsok az újrageneráláshoz vannak tesztek újrafuttatása nélkül.
+
 ---
 
 ## 13. Tag rendszer — @smoke, @regression, @demo
@@ -765,6 +820,7 @@ jobs:
 5. **Categories** — hiba típusok (Product defect, Test defect)
 6. **Retries** — flaky tesztek azonosítása
 7. **Duration** — melyik teszt a leglassabb
+8. **Full Report** — kombinált pass/fail + hiba részletek + network hívások tesztenként — ideális gyors debuggoláshoz eszközök közötti váltás nélkül
 
 ### Nyomonkövethetőség (Traceability)
 
@@ -854,8 +910,13 @@ await allure.link('https://jira.example.com/browse/PROJ-123', 'PROJ-123', 'issue
 │  Reporter-ek (playwright.config.ts-ben definiálva)             │
 │  ├── list         → konzol kimenet (✓ / ✘ + idő)              │
 │  ├── html         → playwright-report/ (HTML fájlok)           │
+│  ├── json         → playwright-report/test-results.json        │
 │  └── allure       → allure-results/ (JSON fájlok)              │
 │                      └── allure serve → böngészős dashboard    │
+│                                                                │
+│  Teszt utáni riport generátorok (tesztek után futnak):         │
+│  ├── network-report → playwright-report/network-report.html    │
+│  └── full-report    → playwright-report/full-report.html       │
 └────────────────────────────────────────────────────────────────┘
 ```
 

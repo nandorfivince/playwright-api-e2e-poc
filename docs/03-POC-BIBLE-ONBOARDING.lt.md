@@ -126,9 +126,12 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,  // CI aplinkoje 2 pakartojimas, lokaliai 0
   timeout: 30_000,             // Maksimaliai 30s/testui (jei nepasibaigs per tiek — klaida)
 
+  globalSetup: './scripts/clean-network-data.ts',  // network-data/ valymas prieš paleidimą
+
   reporter: [
     ['list'],                  // Konsolės išvestis (testų pavadinimai + laikas)
     ['html', { ... }],        // HTML ataskaita (į playwright-report/ katalogą)
+    ['json', { ... }],        // JSON ataskaita (Full Report generavimui)
     ['allure-playwright', { ... }],  // Allure ataskaita (į allure-results/ katalogą)
   ],
 
@@ -309,6 +312,31 @@ Automatiškai visos vaikinės klasės (`UsersApi`, `CountriesGraphQLApi`) tai ga
 2. **Pagalbinės funkcijos** — `setTestMeta()` ir `logResponseTime()`
 
 **Kas kviečia?** Kiekvienas spec failas, kiekvieno testo pradžioje.
+
+### `support/fixtures/base.fixture.ts`
+
+**Kas tai?** Pasirinktinis Playwright fixture, suteikiantis `trackedRequest` — Proxy apgaubtą `APIRequestContext`, kuris automatiškai seka kiekvieną API kvietimą (laiko matavimas, užklausos/atsakymo detalės) be jokio papildomo kodo testuose.
+
+**Kaip veikia?**
+- Apgaubia Playwright integruotą `request` JavaScript `Proxy` objektu
+- Perima kiekvieną HTTP metodo kvietimą (GET, POST, PUT, DELETE ir kt.)
+- Automatiškai matuoja atsakymo laiką
+- Prideda užklausos/atsakymo detales prie Allure ataskaitos
+- Išsaugo tinklo kvietimų duomenis į `network-data/` katalogą ataskaitų generavimui
+
+**Kas naudoja?** Kiekvienas spec failas importuoja `test` ir `expect` iš šio failo vietoj `@playwright/test`.
+
+**Poveikis testams:** Testams nebereikia rankinio `Date.now()` laiko matavimo ar `attachApiDetails()` kvietimų — fixture tai atlieka skaidriai. Testai švaresni, turi tik verslo logiką.
+
+### `support/helpers/network-collector.ts`
+
+**Kas tai?** Pagalbinė priemonė, kuri išsaugo API kvietimų duomenis (užklausos URL, metodas, antraštės, body, atsakymo statusas, atsakymo body, trukmė) kaip atskirus JSON failus `network-data/` kataloge.
+
+**Kodėl atskiri failai?** Playwright vykdo testus lygiagrečiai keliuose worker procesuose. Atmintyje esantis masyvas užfiksuotų tik vieno worker kvietimus. Failų pagrindu veikiantis rinkimas veikia visuose worker procesuose.
+
+**Kas kviečia?** `allure.helper.ts` → `attachApiDetails()` → `saveNetworkCall()`. Tai vyksta automatiškai per `trackedRequest` fixture.
+
+**Kas skaito duomenis?** Ataskaitų generatoriai po testų (`generate-network-report.ts` ir `generate-full-report.ts`) nuskaito visus JSON failus iš `network-data/` HTML ataskaitų kūrimui.
 
 ---
 
@@ -516,8 +544,8 @@ Pavyzdžiai:
 test.describe('REST — GET /users', () => {        // Loginė grupė
   let usersApi: UsersApi;                          // Kintamojo deklaracija
 
-  test.beforeEach(async ({ request }) => {         // Vykdomas PRIEŠ kiekvieną testą
-    usersApi = new UsersApi(request);              // Naujo API Object sukūrimas
+  test.beforeEach(async ({ trackedRequest }) => {  // trackedRequest iš base.fixture.ts
+    usersApi = new UsersApi(trackedRequest);       // API kvietimai automatiškai sekami
   });
 
   test('...', async () => { ... });                // Testas 1
@@ -527,7 +555,7 @@ test.describe('REST — GET /users', () => {        // Loginė grupė
 
 **`test.beforeEach`** — vykdomas prieš kiekvieną testą. Užtikrina, kad kiekvienas testas prasideda švariu būsena (nėra bendrinamo state tarp testų).
 
-**`{ request }`** — Playwright automatiškai suteikia `APIRequestContext`. Tai HTTP klientas, siunčiantis užklausas į sukonfigūruotą `baseURL`.
+**`{ trackedRequest }`** — Suteikiamas `base.fixture.ts`. Apgaubia Playwright `APIRequestContext` Proxy, kuris automatiškai matuoja laiką ir prideda užklausos/atsakymo detales prie ataskaitų. Testai naudoja jį lygiai taip pat kaip standartinį `request` — jokių API pakeitimų nereikia.
 
 ---
 
@@ -650,6 +678,33 @@ allure open allure-report
 
 **Ką mato Test Manager?** Po 3-5 paleidimų su išsaugota istorija Allure dashboard rodo linijų grafikus, kurie rodo stabilumą, greičio pokyčius ir regresijos šablonus laikui bėgant — būtini sprint peržiūroms ir kokybės ataskaitoms.
 
+### Network Report ir Full Report — papildoma ataskaitų sistema
+
+Be Allure, karkasas automatiškai generuoja dvi papildomas HTML ataskaitas po kiekvieno testų paleidimo:
+
+**Network Report** (`playwright-report/network-report.html`)
+- Chrome DevTools Network tab stiliaus sąsaja (tamsi tema)
+- Kiekvienas API kvietimas sąraše: statuso kodas, metodas, URL, laiko žyma, trukmė
+- Paspauskite bet kurį kvietimą → Užklausos/Atsakymo skirtukai — antraščių lentelė, JSON body su Copy mygtuku
+- Filtravimas pagal statusą (All / 2xx / 4xx / 5xx) ir tekstinė paieška
+- Naudinga: užklausos/atsakymo duomenų kopijavimas į OpenSearch, API detalių dalijimasis su backend programuotojais
+
+**Full Report** (`playwright-report/full-report.html`)
+- Kombinuoti testų rezultatai + tinklo duomenys viename vaizde
+- Kairysis skydelis: testų sąrašas su pass/fail piktogramomis, trukmė, failas:eilutė, žymos
+- Dešinysis skydelis kiekvienam testui: klaidos detalės (su kodo fragmentu nepavykusiems), tinklo kvietimai (sulankstomos, su užklausos/atsakymo skirtukais)
+- Panašu į Cypress Cloud Test Replay — bet nemokama, offline, savarankiškas HTML
+
+**Komandos:**
+```bash
+npm run test:network      # Network Report atidarymas naršyklėje
+npm run test:full-report  # Full Report atidarymas naršyklėje
+npm run report:network    # Tik Network Report generavimas
+npm run report:full       # Tik Full Report generavimas
+```
+
+> **Pastaba:** Visos `npm test` / `npm run test:*` komandos automatiškai generuoja abi ataskaitas po testų paleidimo. Atskiros `report:*` komandos skirtos pergeneravimui be testų pakartotinio paleidimo.
+
 ---
 
 ## 13. Žymų sistema — @smoke, @regression, @demo
@@ -765,6 +820,7 @@ jobs:
 5. **Categories** — klaidų tipai (Product defect, Test defect)
 6. **Retries** — flaky testų identifikavimas
 7. **Duration** — kuris testas lėčiausias
+8. **Full Report** — kombinuoti pass/fail + klaidos detalės + tinklo kvietimai kiekvienam testui — idealus greitam derinimui be perjungimo tarp įrankių
 
 ### Atsekamumas (Traceability)
 
@@ -854,8 +910,13 @@ await allure.link('https://jira.example.com/browse/PROJ-123', 'PROJ-123', 'issue
 │  Reporter (apibrėžti playwright.config.ts)                     │
 │  ├── list         → konsolės išvestis (✓ / ✘ + laikas)         │
 │  ├── html         → playwright-report/ (HTML failai)           │
+│  ├── json         → playwright-report/test-results.json        │
 │  └── allure       → allure-results/ (JSON failai)              │
 │                      └── allure serve → naršyklės dashboard    │
+│                                                                │
+│  Ataskaitų generatoriai po testų (vykdomi po testų):          │
+│  ├── network-report → playwright-report/network-report.html    │
+│  └── full-report    → playwright-report/full-report.html       │
 └────────────────────────────────────────────────────────────────┘
 ```
 

@@ -19,9 +19,16 @@ playwright-api-e2e-poc/
 ├── package.json                  ← Dependențe și scripturi npm
 ├── tsconfig.json                 ← Configurare TypeScript + alias-uri de cale
 │
+├── scripts/                      ← GENERATOARE DE RAPOARTE (procesare post-test)
+│   ├── clean-network-data.ts     ← globalSetup: curățare network-data/ înainte de fiecare rulare
+│   ├── generate-network-report.ts ← Generare Network Report stil Chrome DevTools
+│   └── generate-full-report.ts   ← Generare Full Report combinat test + network
+│
 ├── support/                      ← STRATUL FRAMEWORK (nu teste, ci infrastructură)
 │   ├── base/
 │   │   └── BaseApiClient.ts      ← Clasă de bază — toate API Objects moștenesc din aceasta
+│   ├── fixtures/
+│   │   └── base.fixture.ts       ← Fixture Playwright personalizat (trackedRequest — urmărire API automată)
 │   ├── api-client/
 │   │   ├── UsersApi.ts           ← API Object REST (JSONPlaceholder /users)
 │   │   └── CountriesGraphQLApi.ts ← API Object GraphQL (Countries API)
@@ -30,7 +37,8 @@ playwright-api-e2e-poc/
 │   │       └── countries.queries.ts ← Interogări GraphQL + fragmente (gql tag)
 │   └── helpers/
 │       ├── auth.helper.ts        ← Gestionare token (bazat pe env)
-│       └── allure.helper.ts      ← Metadata Allure + măsurare timp de răspuns
+│       ├── allure.helper.ts      ← Metadata Allure + atașamente detalii API
+│       └── network-collector.ts  ← Salvare date apeluri API în fișiere (cross-worker)
 │
 ├── schemas/                      ← SCHEME ZOD (validare structură răspuns)
 │   ├── users.schema.ts           ← REST User/UsersList + BrokenSchema (demo)
@@ -58,6 +66,12 @@ playwright-api-e2e-poc/
 ```
 Fișier Spec (.spec.ts)
   │
+  ├── importă → test, expect din base.fixture.ts (NU din @playwright/test)
+  │                └── oferă trackedRequest (APIRequestContext înfășurat cu Proxy)
+  │                      └── urmărește automat timing-ul + atașează detaliile API
+  │                            ├── → allure.helper.ts (atașamente Allure)
+  │                            └── → network-collector.ts (salvare în network-data/)
+  │
   ├── importă → API Object (UsersApi / CountriesGraphQLApi)
   │                │
   │                └── moștenește → BaseApiClient
@@ -71,7 +85,14 @@ Fișier Spec (.spec.ts)
   │                └── Validare Zod — verificare structură răspuns
   │
   └── importă → allure.helper.ts
-                   └── setTestMeta() + logResponseTime()
+                   └── setTestMeta()
+```
+
+**Lanț de generare rapoarte post-test:**
+```
+network-data/*.json ──→ generate-network-report.ts ──→ playwright-report/network-report.html
+        +
+test-results.json ────→ generate-full-report.ts ────→ playwright-report/full-report.html
 ```
 
 **Lanț suplimentar pentru spec GraphQL:**
@@ -92,7 +113,12 @@ CountriesGraphQLApi
 | `CountriesGraphQLApi.ts` | Apeluri query GraphQL | Vine query GraphQL nou |
 | `countries.queries.ts` | String-uri query + fragmente | Se schimbă structura query-ului |
 | `auth.helper.ts` | Gestionare token | Se schimbă logica de auth |
-| `allure.helper.ts` | Metadata Allure + TestMeta | Feature/epic/story nou |
+| `base.fixture.ts` | Fixture personalizat — trackedRequest (urmărire API automată) | Niciodată (infra framework) |
+| `allure.helper.ts` | Metadata Allure + atașamente detalii API | Feature/epic/story nou |
+| `network-collector.ts` | Salvare date apeluri API în fișiere JSON | Niciodată (infra framework) |
+| `generate-network-report.ts` | Generare HTML Network Report | Schimbări aspect/stil raport |
+| `generate-full-report.ts` | Generare HTML Full Report | Schimbări aspect/stil raport |
+| `clean-network-data.ts` | Curățare network-data/ înainte de rulare | Niciodată (infra framework) |
 | `users.schema.ts` | Schemă Zod răspuns REST | Se schimbă structura răspunsului REST |
 | `countries.schema.ts` | Schemă Zod răspuns GraphQL | Se schimbă structura răspunsului GraphQL |
 | `users.fixture.ts` | Valori așteptate REST | Se schimbă datele de test |
@@ -219,6 +245,8 @@ npm run test:smoke        # Verificare rapidă — totul funcționează?
 3. Scrie testul conform pașilor de mai sus
 4. Rulează: `npx playwright test -g "numeTest"`
 5. Verifică în raportul Allure: `npm run test:allure`
+6. Verifică Network Report pentru detalii API: `npm run test:network`
+7. Verifică Full Report pentru vizualizare combinată: `npm run test:full-report`
 
 ### Înainte de commit
 

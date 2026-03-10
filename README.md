@@ -10,7 +10,7 @@ Proof of Concept — a lightweight, fast, and free API testing framework using P
 | GraphQL support | None | **Native** |
 | Parallel execution | Paid (Cypress Cloud) | **Free, built-in** |
 | API test speed | Slow (browser overhead) | **3–5x faster** |
-| Reporting | Dashboard (paid) | **Allure + HTML (free)** |
+| Reporting | Dashboard (paid) | **Allure + HTML + Network + Full Report (free)** |
 | TypeScript | Partial | **Full, native** |
 | Docker image size | Large (browser deps) | **Minimal (Node only)** |
 | CI/CD pipeline time | Minutes | **Seconds** |
@@ -22,8 +22,10 @@ git clone https://github.com/nandorfivince/playwright-api-e2e-poc.git
 cd playwright-api-e2e-poc
 npm install
 npm test
-npm run test:report # opens Playwright report in browser
-npm run test:allure # opens Allure report in browser
+npm run test:report      # opens Playwright report in browser
+npm run test:allure      # opens Allure report in browser
+npm run test:network     # opens Network Report (Chrome DevTools style)
+npm run test:full-report # opens Full Report (test results + network data combined)
 ```
 
 Or with Docker:

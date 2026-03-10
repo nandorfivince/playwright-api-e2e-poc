@@ -170,6 +170,37 @@ allure generate allure-results -o allure-report --clean
 allure open allure-report
 ```
 
+### Network Report (Chrome DevTools style)
+
+After running tests, a standalone HTML report is auto-generated showing every API call in a Chrome DevTools Network tab style interface — dark theme, request/response details, headers, body with Copy button, status code filtering.
+
+```bash
+# Open the Network Report in browser
+npm run test:network
+
+# Generate only (without opening)
+npm run report:network
+```
+
+This is especially useful for debugging API issues — you can copy request/response data directly into OpenSearch or share it with backend developers.
+
+### Full Report (test results + network data combined)
+
+A combined HTML report that merges Playwright test results (pass/fail, errors, code snippets) with network call data per test. Similar to Cypress Cloud Test Replay, but free and self-contained.
+
+```bash
+# Open the Full Report in browser
+npm run test:full-report
+
+# Generate only (without opening)
+npm run report:full
+```
+
+For each test you see:
+- Pass/fail status, duration, file location, tags
+- Error details with source code snippet (for failed tests)
+- All network calls made during that test — request/response tabs, headers, body, Copy button
+
 ### Allure Trend (history across runs)
 
 Allure can display trend graphs (pass/fail ratio, duration, retries) across multiple test runs. For this, the history from the previous report must be copied into the next run's results.
@@ -264,6 +295,10 @@ npx playwright show-report playwright-report
 | Project + tag | `npx playwright test --project=rest-api --grep @smoke` |
 | Playwright report | `npm run test:report` |
 | Allure report | `npm run test:allure` |
+| Network Report | `npm run test:network` |
+| Full Report | `npm run test:full-report` |
+| Generate Network Report only | `npm run report:network` |
+| Generate Full Report only | `npm run report:full` |
 | Docker — all | `docker compose up --build` |
 | Docker — smoke | `docker compose run api-tests npx playwright test --grep @smoke` |
 | Docker — single test | `docker compose run api-tests npx playwright test -g "testName"` |

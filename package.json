@@ -4,14 +4,18 @@
   "description": "Playwright API E2E Testing POC — REST + GraphQL with Allure reporting",
   "private": true,
   "scripts": {
-    "test": "npx playwright test",
-    "test:rest": "npx playwright test tests/rest/",
-    "test:graphql": "npx playwright test tests/graphql/",
-    "test:smoke": "npx playwright test --grep @smoke",
-    "test:regression": "npx playwright test --grep @regression",
-    "test:demo": "npx playwright test --grep @demo",
+    "test": "npx playwright test; npx tsx scripts/generate-network-report.ts; npx tsx scripts/generate-full-report.ts",
+    "test:rest": "npx playwright test tests/rest/; npx tsx scripts/generate-network-report.ts; npx tsx scripts/generate-full-report.ts",
+    "test:graphql": "npx playwright test tests/graphql/; npx tsx scripts/generate-network-report.ts; npx tsx scripts/generate-full-report.ts",
+    "test:smoke": "npx playwright test --grep @smoke; npx tsx scripts/generate-network-report.ts; npx tsx scripts/generate-full-report.ts",
+    "test:regression": "npx playwright test --grep @regression; npx tsx scripts/generate-network-report.ts; npx tsx scripts/generate-full-report.ts",
+    "test:demo": "npx playwright test --grep @demo; npx tsx scripts/generate-network-report.ts; npx tsx scripts/generate-full-report.ts",
     "test:report": "npx playwright show-report",
-    "test:allure": "npx allure serve allure-results"
+    "test:allure": "npx allure serve allure-results",
+    "test:network": "xdg-open playwright-report/network-report.html 2>/dev/null || open playwright-report/network-report.html",
+    "test:full-report": "xdg-open playwright-report/full-report.html 2>/dev/null || open playwright-report/full-report.html",
+    "report:network": "npx tsx scripts/generate-network-report.ts",
+    "report:full": "npx tsx scripts/generate-full-report.ts"
   },
   "dependencies": {
     "@playwright/test": "^1.50.0",
@@ -21,7 +25,7 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
-    "allure": "^3.2.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.0"
   }
 }

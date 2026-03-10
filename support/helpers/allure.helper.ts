@@ -1,4 +1,6 @@
+import { APIResponse, test } from '@playwright/test';
 import { allure } from 'allure-playwright';
+import { saveNetworkCall } from './network-collector';
 
 // ─── Centralized Test Metadata ──────────────────────────────────
 
@@ -55,4 +57,64 @@ export async function logResponseTime(startMs: number): Promise<number> {
   const duration = Date.now() - startMs;
   await allure.parameter('Response time (ms)', duration.toString());
   return duration;
+}
+
+// ─── Network Details Attachment (Chrome DevTools style) ─────────
+
+interface RequestInfo {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+  durationMs?: number;
+}
+
+/**
+ * Attach full HTTP request/response details to Allure report.
+ * Provides a "Network tab" experience — method, URL, status, headers, body.
+ * Call this BEFORE assertions so details are attached even on test failure.
+ */
+export async function attachApiDetails(
+  response: APIResponse,
+  requestInfo?: RequestInfo,
+): Promise<void> {
+  const startTime = Date.now();
+
+  const request = {
+    method: requestInfo?.method ?? 'GET',
+    url: response.url(),
+    ...(requestInfo?.headers && { headers: requestInfo.headers }),
+    ...(requestInfo?.body !== undefined && { body: requestInfo.body }),
+  };
+
+  await allure.attachment('Request', JSON.stringify(request, null, 2), 'application/json');
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    try {
+      body = await response.text();
+    } catch {
+      body = '[unable to read body]';
+    }
+  }
+
+  const responseData = {
+    status: response.status(),
+    statusText: response.statusText(),
+    headers: response.headers(),
+    body,
+  };
+
+  await allure.attachment('Response', JSON.stringify(responseData, null, 2), 'application/json');
+
+  // Save to network-data for standalone HTML report
+  const testName = test.info().title;
+  saveNetworkCall({
+    testName,
+    timestamp: new Date().toISOString(),
+    durationMs: requestInfo?.durationMs,
+    request,
+    response: responseData,
+  });
 }

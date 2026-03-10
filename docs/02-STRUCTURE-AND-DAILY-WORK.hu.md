@@ -19,9 +19,16 @@ playwright-api-e2e-poc/
 ├── package.json                  ← Függőségek és npm scriptek
 ├── tsconfig.json                 ← TypeScript beállítások + path alias-ok
 │
+├── scripts/                      ← RIPORT GENERÁTOROK (teszt utáni feldolgozás)
+│   ├── clean-network-data.ts     ← globalSetup: network-data/ törlése minden futás előtt
+│   ├── generate-network-report.ts ← Chrome DevTools stílusú Network Report generálás
+│   └── generate-full-report.ts   ← Kombinált teszt + network Full Report generálás
+│
 ├── support/                      ← FRAMEWORK RÉTEG (nem teszt, hanem infrastruktúra)
 │   ├── base/
 │   │   └── BaseApiClient.ts      ← Alap osztály — minden API Object ebből örököl
+│   ├── fixtures/
+│   │   └── base.fixture.ts       ← Egyedi Playwright fixture (trackedRequest — automatikus API tracking)
 │   ├── api-client/
 │   │   ├── UsersApi.ts           ← REST API Object (JSONPlaceholder /users)
 │   │   └── CountriesGraphQLApi.ts ← GraphQL API Object (Countries API)
@@ -30,7 +37,8 @@ playwright-api-e2e-poc/
 │   │       └── countries.queries.ts ← GraphQL query-k + fragment-ek (gql tag)
 │   └── helpers/
 │       ├── auth.helper.ts        ← Token kezelés (env-alapú)
-│       └── allure.helper.ts      ← Allure metadata + response time mérés
+│       ├── allure.helper.ts      ← Allure metadata + API részlet csatolmányok
+│       └── network-collector.ts  ← API hívás adatok mentése fájlba (cross-worker)
 │
 ├── schemas/                      ← ZOD SÉMÁK (válasz struktúra validáció)
 │   ├── users.schema.ts           ← REST User/UsersList + BrokenSchema (demo)
@@ -58,6 +66,12 @@ playwright-api-e2e-poc/
 ```
 Spec fájl (.spec.ts)
   │
+  ├── importálja → test, expect a base.fixture.ts-ből (NEM a @playwright/test-ből)
+  │                   └── trackedRequest-et biztosít (Proxy-csomagolt APIRequestContext)
+  │                         └── automatikusan méri az időt + csatolja az API részleteket
+  │                               ├── → allure.helper.ts (Allure csatolmányok)
+  │                               └── → network-collector.ts (mentés network-data/-ba)
+  │
   ├── importálja → API Object (UsersApi / CountriesGraphQLApi)
   │                   │
   │                   └── örököl → BaseApiClient
@@ -71,7 +85,14 @@ Spec fájl (.spec.ts)
   │                   └── Zod validáció — response struktúra ellenőrzés
   │
   └── importálja → allure.helper.ts
-                      └── setTestMeta() + logResponseTime()
+                      └── setTestMeta()
+```
+
+**Teszt utáni riport generálási lánc:**
+```
+network-data/*.json ──→ generate-network-report.ts ──→ playwright-report/network-report.html
+        +
+test-results.json ────→ generate-full-report.ts ────→ playwright-report/full-report.html
 ```
 
 **GraphQL spec-nél egy extra lánc:**
@@ -92,7 +113,12 @@ CountriesGraphQLApi
 | `CountriesGraphQLApi.ts` | GraphQL query hívások | Új GraphQL query jön |
 | `countries.queries.ts` | Query stringek + fragment-ek | Query struktúra változik |
 | `auth.helper.ts` | Token kezelés | Auth logika változik |
-| `allure.helper.ts` | Allure metadata + TestMeta | Új feature/epic/story |
+| `base.fixture.ts` | Egyedi fixture — trackedRequest (automatikus API tracking) | Soha (framework infra) |
+| `allure.helper.ts` | Allure metadata + API részlet csatolmányok | Új feature/epic/story |
+| `network-collector.ts` | API hívás adatok mentése JSON fájlba | Soha (framework infra) |
+| `generate-network-report.ts` | Network Report HTML generálás | Riport kinézet/stílus változik |
+| `generate-full-report.ts` | Full Report HTML generálás | Riport kinézet/stílus változik |
+| `clean-network-data.ts` | network-data/ törlése teszt futás előtt | Soha (framework infra) |
 | `users.schema.ts` | REST response Zod séma | REST válasz struktúra változik |
 | `countries.schema.ts` | GraphQL response Zod séma | GraphQL válasz struktúra változik |
 | `users.fixture.ts` | REST elvárt értékek | Teszt adatok változnak |
@@ -219,6 +245,8 @@ npm run test:smoke        # Gyors ellenőrzés — minden működik?
 3. Írd meg a tesztet a fenti lépések szerint
 4. Futtasd: `npx playwright test -g "tesztNév"`
 5. Ellenőrizd az Allure riportban: `npm run test:allure`
+6. Nézd meg a Network Report-ot API részletekért: `npm run test:network`
+7. Nézd meg a Full Report-ot kombinált nézetért: `npm run test:full-report`
 
 ### Commit előtt
 

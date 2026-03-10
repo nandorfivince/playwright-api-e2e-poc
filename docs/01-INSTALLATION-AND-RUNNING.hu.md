@@ -170,6 +170,37 @@ allure generate allure-results -o allure-report --clean
 allure open allure-report
 ```
 
+### Network Report (Chrome DevTools stílusú)
+
+A tesztek futtatása után automatikusan generálódik egy önálló HTML riport, amely minden API hívást Chrome DevTools Network tab stílusban mutat — sötét téma, request/response részletek, headerek, body Copy gombbal, státusz kód szűrés.
+
+```bash
+# Network Report megnyitása böngészőben
+npm run test:network
+
+# Csak generálás (megnyitás nélkül)
+npm run report:network
+```
+
+Ez különösen hasznos API hibák debuggolásához — a request/response adatokat közvetlenül másolhatod OpenSearch-be vagy megoszthatod a backend fejlesztőkkel.
+
+### Full Report (teszt eredmények + network adatok egyben)
+
+Egy kombinált HTML riport ami ötvözi a Playwright teszt eredményeket (pass/fail, hibák, kód részletek) a network hívás adatokkal tesztenként. Hasonló a Cypress Cloud Test Replay-hez, de ingyenes és önálló fájl.
+
+```bash
+# Full Report megnyitása böngészőben
+npm run test:full-report
+
+# Csak generálás (megnyitás nélkül)
+npm run report:full
+```
+
+Minden tesztnél látod:
+- Pass/fail státusz, futási idő, fájl elérés, tag-ek
+- Hiba részletek forráskód részlettel (bukó teszteknél)
+- Az összes network hívás a teszt alatt — request/response tab-ok, headerek, body, Copy gomb
+
 ### Allure Trend (futtatások közötti előzmények)
 
 Az Allure képes trend grafikonokat megjeleníteni (pass/fail arány, futási idő, retry-ok) több futtatás között. Ehhez az előző riport history mappáját kell visszamásolni a következő futás eredményei közé.
@@ -264,6 +295,10 @@ npx playwright show-report playwright-report
 | Projekt + tag | `npx playwright test --project=rest-api --grep @smoke` |
 | Playwright riport | `npm run test:report` |
 | Allure riport | `npm run test:allure` |
+| Network Report | `npm run test:network` |
+| Full Report | `npm run test:full-report` |
+| Csak Network Report generálás | `npm run report:network` |
+| Csak Full Report generálás | `npm run report:full` |
 | Docker — összes | `docker compose up --build` |
 | Docker — smoke | `docker compose run api-tests npx playwright test --grep @smoke` |
 | Docker — egy teszt | `docker compose run api-tests npx playwright test -g "tesztNév"` |

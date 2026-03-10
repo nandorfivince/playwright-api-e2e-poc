@@ -4,6 +4,9 @@ playwright-report/
 allure-results/
 allure-report/
 test-results/
+network-data/
+network-report.html
+full-report.html
 .env.local
 .env.staging
 .env.production

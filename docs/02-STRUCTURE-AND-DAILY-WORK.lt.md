@@ -19,9 +19,16 @@ playwright-api-e2e-poc/
 ├── package.json                  ← Priklausomybės ir npm skriptai
 ├── tsconfig.json                 ← TypeScript nustatymai + kelio alias'ai
 │
+├── scripts/                      ← ATASKAITŲ GENERATORIAI (apdorojimas po testų)
+│   ├── clean-network-data.ts     ← globalSetup: network-data/ valymas prieš kiekvieną paleidimą
+│   ├── generate-network-report.ts ← Chrome DevTools stiliaus Network Report generavimas
+│   └── generate-full-report.ts   ← Kombinuotas testų + tinklo Full Report generavimas
+│
 ├── support/                      ← KARKASO SLUOKSNIS (ne testai, o infrastruktūra)
 │   ├── base/
 │   │   └── BaseApiClient.ts      ← Bazinė klasė — visi API Objects paveldi iš jos
+│   ├── fixtures/
+│   │   └── base.fixture.ts       ← Pasirinktinis Playwright fixture (trackedRequest — automatinis API sekimas)
 │   ├── api-client/
 │   │   ├── UsersApi.ts           ← REST API Object (JSONPlaceholder /users)
 │   │   └── CountriesGraphQLApi.ts ← GraphQL API Object (Countries API)
@@ -30,7 +37,8 @@ playwright-api-e2e-poc/
 │   │       └── countries.queries.ts ← GraphQL užklausos + fragmentai (gql tag)
 │   └── helpers/
 │       ├── auth.helper.ts        ← Token valdymas (env pagrindu)
-│       └── allure.helper.ts      ← Allure metaduomenys + atsako laiko matavimas
+│       ├── allure.helper.ts      ← Allure metaduomenys + API detalių priedai
+│       └── network-collector.ts  ← API kvietimų duomenų saugojimas failuose (cross-worker)
 │
 ├── schemas/                      ← ZOD SCHEMOS (atsako struktūros validacija)
 │   ├── users.schema.ts           ← REST User/UsersList + BrokenSchema (demo)
@@ -58,6 +66,12 @@ playwright-api-e2e-poc/
 ```
 Spec failas (.spec.ts)
   │
+  ├── importuoja → test, expect iš base.fixture.ts (NE iš @playwright/test)
+  │                   └── suteikia trackedRequest (Proxy apgaubtą APIRequestContext)
+  │                         └── automatiškai matuoja laiką + prideda API detales
+  │                               ├── → allure.helper.ts (Allure priedai)
+  │                               └── → network-collector.ts (saugojimas į network-data/)
+  │
   ├── importuoja → API Object (UsersApi / CountriesGraphQLApi)
   │                   │
   │                   └── paveldi → BaseApiClient
@@ -71,7 +85,14 @@ Spec failas (.spec.ts)
   │                   └── Zod validacija — atsako struktūros tikrinimas
   │
   └── importuoja → allure.helper.ts
-                      └── setTestMeta() + logResponseTime()
+                      └── setTestMeta()
+```
+
+**Ataskaitų generavimo grandinė po testų:**
+```
+network-data/*.json ──→ generate-network-report.ts ──→ playwright-report/network-report.html
+        +
+test-results.json ────→ generate-full-report.ts ────→ playwright-report/full-report.html
 ```
 
 **Papildoma grandinė GraphQL spec'ams:**
@@ -92,7 +113,12 @@ CountriesGraphQLApi
 | `CountriesGraphQLApi.ts` | GraphQL užklausų kvietimai | Atsiranda nauja GraphQL užklausa |
 | `countries.queries.ts` | Užklausų eilutės + fragmentai | Keičiasi užklausos struktūra |
 | `auth.helper.ts` | Token valdymas | Keičiasi auth logika |
-| `allure.helper.ts` | Allure metaduomenys + TestMeta | Naujas feature/epic/story |
+| `base.fixture.ts` | Pasirinktinis fixture — trackedRequest (automatinis API sekimas) | Niekada (karkaso infra) |
+| `allure.helper.ts` | Allure metaduomenys + API detalių priedai | Naujas feature/epic/story |
+| `network-collector.ts` | API kvietimų duomenų saugojimas JSON failuose | Niekada (karkaso infra) |
+| `generate-network-report.ts` | Network Report HTML generavimas | Ataskaitos išvaizda/stilius keičiasi |
+| `generate-full-report.ts` | Full Report HTML generavimas | Ataskaitos išvaizda/stilius keičiasi |
+| `clean-network-data.ts` | network-data/ valymas prieš testų paleidimą | Niekada (karkaso infra) |
 | `users.schema.ts` | REST atsako Zod schema | Keičiasi REST atsako struktūra |
 | `countries.schema.ts` | GraphQL atsako Zod schema | Keičiasi GraphQL atsako struktūra |
 | `users.fixture.ts` | REST laukiamos reikšmės | Keičiasi testo duomenys |
@@ -219,6 +245,8 @@ npm run test:smoke        # Greitas patikrinimas — viskas veikia?
 3. Parašykite testą pagal aukščiau pateiktus žingsnius
 4. Paleiskite: `npx playwright test -g "testoPavadinimas"`
 5. Patikrinkite Allure ataskaitoje: `npm run test:allure`
+6. Peržiūrėkite Network Report API detalėms: `npm run test:network`
+7. Peržiūrėkite Full Report kombinuotam vaizdui: `npm run test:full-report`
 
 ### Prieš commit
 

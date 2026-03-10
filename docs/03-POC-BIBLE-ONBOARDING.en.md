@@ -126,9 +126,12 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,  // 2 retries in CI, 0 locally
   timeout: 30_000,             // Maximum 30s/test (if it doesn't finish in time, it's failing)
 
+  globalSetup: './scripts/clean-network-data.ts',  // Clears network-data/ before run
+
   reporter: [
     ['list'],                  // Console output (test names + time)
     ['html', { ... }],        // HTML report (to playwright-report/ folder)
+    ['json', { ... }],        // JSON report (for Full Report generation)
     ['allure-playwright', { ... }],  // Allure report (to allure-results/ folder)
   ],
 
@@ -309,6 +312,31 @@ Every child (`UsersApi`, `CountriesGraphQLApi`) automatically receives it. No ne
 2. **Helper functions** — `setTestMeta()` and `logResponseTime()`
 
 **Who calls it?** Every spec file, at the beginning of every test.
+
+### `support/fixtures/base.fixture.ts`
+
+**What is this?** A custom Playwright fixture that provides `trackedRequest` — a Proxy-wrapped `APIRequestContext` that automatically tracks every API call (timing, request/response details) without any boilerplate in tests.
+
+**How does it work?**
+- Wraps Playwright's built-in `request` with a JavaScript `Proxy`
+- Intercepts every HTTP method call (GET, POST, PUT, DELETE, etc.)
+- Automatically measures response time
+- Attaches request/response details to Allure report
+- Saves network call data to `network-data/` directory for report generation
+
+**Who uses it?** Every spec file imports `test` and `expect` from this file instead of `@playwright/test`.
+
+**Impact on tests:** Tests no longer need manual `Date.now()` timing or `attachApiDetails()` calls — the fixture handles it transparently. Tests are cleaner, containing only business logic.
+
+### `support/helpers/network-collector.ts`
+
+**What is this?** A utility that saves API call data (request URL, method, headers, body, response status, response body, duration) as individual JSON files in the `network-data/` directory.
+
+**Why individual files?** Playwright runs tests in parallel across multiple workers. An in-memory array would only capture calls from one worker. File-based collection works across all workers.
+
+**Who calls it?** `allure.helper.ts` → `attachApiDetails()` → `saveNetworkCall()`. This happens automatically via the `trackedRequest` fixture.
+
+**Who reads the data?** The post-test report generators (`generate-network-report.ts` and `generate-full-report.ts`) read all JSON files from `network-data/` to build the HTML reports.
 
 ---
 
@@ -516,8 +544,8 @@ Examples:
 test.describe('REST — GET /users', () => {        // Logical group
   let usersApi: UsersApi;                          // Variable declaration
 
-  test.beforeEach(async ({ request }) => {         // Runs BEFORE every test
-    usersApi = new UsersApi(request);              // Create new API Object
+  test.beforeEach(async ({ trackedRequest }) => {  // trackedRequest from base.fixture.ts
+    usersApi = new UsersApi(trackedRequest);       // API calls are auto-tracked
   });
 
   test('...', async () => { ... });                // Test 1
@@ -527,7 +555,7 @@ test.describe('REST — GET /users', () => {        // Logical group
 
 **`test.beforeEach`** — runs before every test. Ensures that every test starts from a clean state (no shared state between tests).
 
-**`{ request }`** — Playwright automatically provides an `APIRequestContext`. This is the HTTP client that sends requests to the configured `baseURL`.
+**`{ trackedRequest }`** — Provided by `base.fixture.ts`. It wraps Playwright's `APIRequestContext` with a Proxy that automatically tracks timing and attaches request/response details to reports. Tests use it exactly like the standard `request` — no API changes needed.
 
 ---
 
@@ -650,6 +678,33 @@ allure open allure-report
 
 **What does the Test Manager see?** After 3-5 runs with history preserved, the Allure dashboard displays line charts showing stability, speed changes, and regression patterns over time — essential for sprint reviews and quality reporting.
 
+### Network Report and Full Report — additional reporting
+
+Beyond Allure, the framework generates two additional HTML reports automatically after every test run:
+
+**Network Report** (`playwright-report/network-report.html`)
+- Chrome DevTools Network tab style interface (dark theme)
+- Every API call listed with: status code, method, URL, timestamp, duration
+- Click any call to see Request/Response tabs — headers table, JSON body with Copy button
+- Filter by status (All / 2xx / 4xx / 5xx) and text search
+- Useful for: copying request/response data to OpenSearch, sharing API details with backend developers
+
+**Full Report** (`playwright-report/full-report.html`)
+- Combined test results + network data in one view
+- Left panel: test list with pass/fail icons, duration, file:line, tags
+- Right panel per test: error details (with source code snippet for failures), network calls (collapsible, with request/response tabs)
+- Similar to Cypress Cloud Test Replay — but free, offline, self-contained HTML
+
+**Commands:**
+```bash
+npm run test:network      # Open Network Report in browser
+npm run test:full-report  # Open Full Report in browser
+npm run report:network    # Generate Network Report only
+npm run report:full       # Generate Full Report only
+```
+
+> **Note:** All `npm test` / `npm run test:*` commands automatically generate both reports after the test run. The separate `report:*` commands are for regenerating without re-running tests.
+
 ---
 
 ## 13. Tag system — @smoke, @regression, @demo
@@ -765,6 +820,7 @@ jobs:
 5. **Categories** — error types (Product defect, Test defect)
 6. **Retries** — flaky test identification
 7. **Duration** — which test is the slowest
+8. **Full Report** — combined pass/fail + error details + network calls per test — ideal for quick debugging without switching between tools
 
 ### Traceability
 
@@ -855,8 +911,13 @@ await allure.link('https://jira.example.com/browse/PROJ-123', 'PROJ-123', 'issue
 │  Reporters (defined in playwright.config.ts)                   │
 │  ├── list         → console output (✓ / ✘ + time)             │
 │  ├── html         → playwright-report/ (HTML files)            │
+│  ├── json         → playwright-report/test-results.json        │
 │  └── allure       → allure-results/ (JSON files)               │
 │                      └── allure serve → browser dashboard      │
+│                                                                │
+│  Post-test report generators (run after tests):                │
+│  ├── network-report → playwright-report/network-report.html    │
+│  └── full-report    → playwright-report/full-report.html       │
 └────────────────────────────────────────────────────────────────┘
 ```
 

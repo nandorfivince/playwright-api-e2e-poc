@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../support/fixtures/base.fixture';
 import { CountriesGraphQLApi } from '../../support/api-client/CountriesGraphQLApi';
 import {
   CountriesResponseSchema,
@@ -7,15 +7,15 @@ import {
   CountryBrokenSchema,
 } from '../../schemas/countries.schema';
 import { CountryFixtures } from '../fixtures/countries.fixture';
-import { TestMeta, setTestMeta, logResponseTime } from '../../support/helpers/allure.helper';
+import { TestMeta, setTestMeta } from '../../support/helpers/allure.helper';
 
 const meta = TestMeta.countries;
 
 test.describe('GraphQL — Countries', () => {
   let countriesApi: CountriesGraphQLApi;
 
-  test.beforeEach(async ({ request }) => {
-    countriesApi = new CountriesGraphQLApi(request);
+  test.beforeEach(async ({ trackedRequest }) => {
+    countriesApi = new CountriesGraphQLApi(trackedRequest);
   });
 
   // ─── Positive Tests ─────────────────────────────────────────
@@ -23,10 +23,7 @@ test.describe('GraphQL — Countries', () => {
   test('@smoke shouldReturnCountriesListWhenQueried', async () => {
     await setTestMeta({ ...meta, story: meta.stories.list });
 
-    const start = Date.now();
     const response = await countriesApi.getCountries();
-    await logResponseTime(start);
-
     const body = await response.json();
 
     expect(response.status()).toBe(200);
@@ -37,10 +34,7 @@ test.describe('GraphQL — Countries', () => {
   test('@smoke shouldReturnHungaryDetailsWhenCodeIsHU', async () => {
     await setTestMeta({ ...meta, story: meta.stories.byCode });
 
-    const start = Date.now();
     const response = await countriesApi.getCountryByCode(CountryFixtures.hungary.code);
-    await logResponseTime(start);
-
     const body = await response.json();
     const country = body.data.country;
 

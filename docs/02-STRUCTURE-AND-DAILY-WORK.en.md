@@ -19,9 +19,16 @@ playwright-api-e2e-poc/
 ├── package.json                  ← Dependencies and npm scripts
 ├── tsconfig.json                 ← TypeScript settings + path aliases
 │
+├── scripts/                      ← REPORT GENERATORS (post-test processing)
+│   ├── clean-network-data.ts     ← globalSetup: clears network-data/ before each run
+│   ├── generate-network-report.ts ← Generates Chrome DevTools style Network Report
+│   └── generate-full-report.ts   ← Generates combined test + network Full Report
+│
 ├── support/                      ← FRAMEWORK LAYER (not tests, but infrastructure)
 │   ├── base/
 │   │   └── BaseApiClient.ts      ← Base class — all API Objects inherit from this
+│   ├── fixtures/
+│   │   └── base.fixture.ts       ← Custom Playwright fixture (trackedRequest — auto API tracking)
 │   ├── api-client/
 │   │   ├── UsersApi.ts           ← REST API Object (JSONPlaceholder /users)
 │   │   └── CountriesGraphQLApi.ts ← GraphQL API Object (Countries API)
@@ -30,7 +37,8 @@ playwright-api-e2e-poc/
 │   │       └── countries.queries.ts ← GraphQL queries + fragments (gql tag)
 │   └── helpers/
 │       ├── auth.helper.ts        ← Token management (env-based)
-│       └── allure.helper.ts      ← Allure metadata + response time measurement
+│       ├── allure.helper.ts      ← Allure metadata + API detail attachments
+│       └── network-collector.ts  ← Saves API call data to files (cross-worker)
 │
 ├── schemas/                      ← ZOD SCHEMAS (response structure validation)
 │   ├── users.schema.ts           ← REST User/UsersList + BrokenSchema (demo)
@@ -58,6 +66,12 @@ playwright-api-e2e-poc/
 ```
 Spec file (.spec.ts)
   │
+  ├── imports → test, expect from base.fixture.ts (NOT from @playwright/test)
+  │                └── provides trackedRequest (Proxy-wrapped APIRequestContext)
+  │                      └── automatically tracks timing + attaches API details
+  │                            ├── → allure.helper.ts (Allure attachments)
+  │                            └── → network-collector.ts (saves to network-data/)
+  │
   ├── imports → API Object (UsersApi / CountriesGraphQLApi)
   │                │
   │                └── extends → BaseApiClient
@@ -71,7 +85,14 @@ Spec file (.spec.ts)
   │                └── Zod validation — response structure checking
   │
   └── imports → allure.helper.ts
-                   └── setTestMeta() + logResponseTime()
+                   └── setTestMeta()
+```
+
+**Post-test report generation chain:**
+```
+network-data/*.json ──→ generate-network-report.ts ──→ playwright-report/network-report.html
+        +
+test-results.json ────→ generate-full-report.ts ────→ playwright-report/full-report.html
 ```
 
 **Additional chain for GraphQL specs:**
@@ -92,7 +113,12 @@ CountriesGraphQLApi
 | `CountriesGraphQLApi.ts` | GraphQL query calls | New GraphQL query added |
 | `countries.queries.ts` | Query strings + fragments | Query structure changes |
 | `auth.helper.ts` | Token management | Auth logic changes |
-| `allure.helper.ts` | Allure metadata + TestMeta | New feature/epic/story |
+| `base.fixture.ts` | Custom fixture — trackedRequest (auto API tracking) | Never (framework infra) |
+| `allure.helper.ts` | Allure metadata + API detail attachments | New feature/epic/story |
+| `network-collector.ts` | Saves API call data to JSON files | Never (framework infra) |
+| `generate-network-report.ts` | Generates Network Report HTML | Report layout/style changes |
+| `generate-full-report.ts` | Generates Full Report HTML | Report layout/style changes |
+| `clean-network-data.ts` | Clears network-data/ before test run | Never (framework infra) |
 | `users.schema.ts` | REST response Zod schema | REST response structure changes |
 | `countries.schema.ts` | GraphQL response Zod schema | GraphQL response structure changes |
 | `users.fixture.ts` | REST expected values | Test data changes |
@@ -219,6 +245,8 @@ npm run test:smoke        # Quick check — everything working?
 3. Write the test following the steps above
 4. Run it: `npx playwright test -g "testName"`
 5. Verify in Allure report: `npm run test:allure`
+6. Check Network Report for API details: `npm run test:network`
+7. Check Full Report for combined view: `npm run test:full-report`
 
 ### Before commit
 

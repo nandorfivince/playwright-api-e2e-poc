@@ -4,65 +4,14 @@ on:
   push:
   pull_request:
   workflow_dispatch:
-  schedule:
-    - cron: '0 * * * *' # Every hour
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
-  smoke:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-      - name: Run smoke tests
-        run: npx playwright test --grep @smoke
-      - name: Upload Allure results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: allure-results-smoke
-          path: allure-results/
-          retention-days: 30
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-smoke
-          path: playwright-report/
-          retention-days: 30
-
-  regression:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-      - name: Run regression tests
-        run: npx playwright test --grep @regression
-      - name: Upload Allure results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: allure-results-regression
-          path: allure-results/
-          retention-days: 30
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-regression
-          path: playwright-report/
-          retention-days: 30
-
-  demo:
+  test-and-deploy:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -71,52 +20,55 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-      - name: Run demo tests (expected failures)
-        run: npx playwright test --grep @demo
-      - name: Upload Allure results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: allure-results-demo
-          path: allure-results/
-          retention-days: 30
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-demo
-          path: playwright-report/
-          retention-days: 30
 
-  all-tests:
-    runs-on: ubuntu-latest
-    needs: [smoke, regression, demo]
-    if: always()
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
       - name: Install dependencies
         run: npm ci
-      - name: Run all tests
-        run: npx playwright test
+
+      - name: Install Allure CLI
+        run: npm install -g allure-commandline
+
+      - name: Run all tests + generate reports
+        run: npm test
         continue-on-error: true
-      - name: Upload Allure results
+
+      - name: Generate Allure HTML report
+        if: always()
+        run: allure generate allure-results -o playwright-report/allure --clean
+
+      - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: allure-results-all
-          path: allure-results/
-          retention-days: 30
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-all
+          name: all-reports
           path: playwright-report/
           retention-days: 30
+
+      - name: Upload Pages artifact
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: playwright-report/
+
+      - name: Print report URLs
+        if: always()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "  Reports available at:"
+          echo "  Playwright HTML  → https://nandorfivince.github.io/playwright-api-e2e-poc/"
+          echo "  Allure Report    → https://nandorfivince.github.io/playwright-api-e2e-poc/allure/index.html"
+          echo "  Network Report   → https://nandorfivince.github.io/playwright-api-e2e-poc/network-report.html"
+          echo "  Full Report      → https://nandorfivince.github.io/playwright-api-e2e-poc/full-report.html"
+          echo "=========================================="
+
+  deploy:
+    needs: test-and-deploy
+    if: always()
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

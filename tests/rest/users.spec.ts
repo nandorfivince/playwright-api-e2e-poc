@@ -1,16 +1,16 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../support/fixtures/base.fixture';
 import { UsersApi } from '../../support/api-client/UsersApi';
 import { UsersListSchema, UserBrokenSchema } from '../../schemas/users.schema';
 import { UserFixtures } from '../fixtures/users.fixture';
-import { TestMeta, setTestMeta, logResponseTime } from '../../support/helpers/allure.helper';
+import { TestMeta, setTestMeta } from '../../support/helpers/allure.helper';
 
 const meta = TestMeta.users;
 
 test.describe('REST — GET /users', () => {
   let usersApi: UsersApi;
 
-  test.beforeEach(async ({ request }) => {
-    usersApi = new UsersApi(request);
+  test.beforeEach(async ({ trackedRequest }) => {
+    usersApi = new UsersApi(trackedRequest);
   });
 
   // ─── Positive Tests ─────────────────────────────────────────
@@ -18,10 +18,7 @@ test.describe('REST — GET /users', () => {
   test('@smoke shouldReturn200WithUsersListWhenCalled', async () => {
     await setTestMeta({ ...meta, story: meta.stories.list });
 
-    const start = Date.now();
     const response = await usersApi.getUsers();
-    await logResponseTime(start);
-
     const users = await response.json();
 
     expect(response.status()).toBe(200);
@@ -32,10 +29,7 @@ test.describe('REST — GET /users', () => {
   test('@smoke shouldReturnSingleUserWhenIdIsValid', async () => {
     await setTestMeta({ ...meta, story: meta.stories.byId });
 
-    const start = Date.now();
     const response = await usersApi.getUserById(UserFixtures.firstUser.id);
-    await logResponseTime(start);
-
     const user = await response.json();
 
     expect(response.status()).toBe(200);
@@ -100,8 +94,8 @@ test.describe('REST — GET /users', () => {
     await setTestMeta({ ...meta, story: meta.stories.slowResponse, severity: 'normal' });
 
     const start = Date.now();
-    await usersApi.getUsers();
-    const duration = await logResponseTime(start);
+    const response = await usersApi.getUsers();
+    const duration = Date.now() - start;
 
     // INTENTIONAL FAILURE: 1ms is impossible for a network call.
     // This demonstrates response time threshold monitoring.

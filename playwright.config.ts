@@ -6,11 +6,13 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 2 : undefined,
   timeout: 30_000,
+  globalSetup: './scripts/clean-network-data.ts',
 
   reporter: [
     ['list'],
     ['html', { open: 'never', outputFolder: 'playwright-report' }],
-    ['allure-playwright', { outputFolder: 'allure-results' }],
+    ['json', { outputFile: 'playwright-report/test-results.json' }],
+    ['allure-playwright', { outputFolder: 'allure-results', clean: false }],
   ],
 
   use: {

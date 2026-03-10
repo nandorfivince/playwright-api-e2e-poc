@@ -170,6 +170,37 @@ allure generate allure-results -o allure-report --clean
 allure open allure-report
 ```
 
+### Network Report (stil Chrome DevTools)
+
+După rularea testelor, se generează automat un raport HTML independent care arată fiecare apel API în stil Chrome DevTools Network tab — temă întunecată, detalii request/response, headere, body cu buton Copy, filtrare după status code.
+
+```bash
+# Deschidere Network Report în browser
+npm run test:network
+
+# Doar generare (fără deschidere)
+npm run report:network
+```
+
+Aceasta este deosebit de utilă pentru depanarea problemelor API — poți copia datele request/response direct în OpenSearch sau le poți partaja cu dezvoltatorii backend.
+
+### Full Report (rezultate teste + date network combinate)
+
+Un raport HTML combinat care îmbină rezultatele testelor Playwright (pass/fail, erori, fragmente de cod) cu datele apelurilor network per test. Similar cu Cypress Cloud Test Replay, dar gratuit și autonom.
+
+```bash
+# Deschidere Full Report în browser
+npm run test:full-report
+
+# Doar generare (fără deschidere)
+npm run report:full
+```
+
+Pentru fiecare test vezi:
+- Status pass/fail, durată, locația fișierului, taguri
+- Detalii erori cu fragment de cod sursă (pentru testele eșuate)
+- Toate apelurile network efectuate în timpul testului — tab-uri request/response, headere, body, buton Copy
+
 ### Allure Trend (istoricul între rulări)
 
 Allure poate afișa grafice de tendință (raport pass/fail, durata, reîncercări) între mai multe rulări de teste. Pentru aceasta, istoricul din raportul anterior trebuie copiat în rezultatele următoarei rulări.
@@ -264,6 +295,10 @@ npx playwright show-report playwright-report
 | Proiect + tag | `npx playwright test --project=rest-api --grep @smoke` |
 | Raport Playwright | `npm run test:report` |
 | Raport Allure | `npm run test:allure` |
+| Network Report | `npm run test:network` |
+| Full Report | `npm run test:full-report` |
+| Doar generare Network Report | `npm run report:network` |
+| Doar generare Full Report | `npm run report:full` |
 | Docker — toate | `docker compose up --build` |
 | Docker — smoke | `docker compose run api-tests npx playwright test --grep @smoke` |
 | Docker — un test | `docker compose run api-tests npx playwright test -g "numeleTestului"` |
