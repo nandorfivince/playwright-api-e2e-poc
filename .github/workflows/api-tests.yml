@@ -72,3 +72,15 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Print report URLs
+        if: always()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "  Reports available at:"
+          echo "  Playwright HTML  → https://nandorfivince.github.io/playwright-api-e2e-poc/"
+          echo "  Allure Report    → https://nandorfivince.github.io/playwright-api-e2e-poc/allure/index.html"
+          echo "  Network Report   → https://nandorfivince.github.io/playwright-api-e2e-poc/network-report.html"
+          echo "  Full Report      → https://nandorfivince.github.io/playwright-api-e2e-poc/full-report.html"
+          echo "=========================================="
